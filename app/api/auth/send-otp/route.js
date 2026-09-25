@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getRedisClient } from '@/lib/redis';
-import { getResendClient } from '@/lib/resend';
+import { sendOtpEmail } from '@/lib/mailer';
 import { normalizeEmail, isValidEmail, generateSecureOtp, hashOtp } from '@/lib/utils';
 
 // Constants
@@ -23,7 +23,6 @@ export async function POST(request) {
     }
 
     const redis = getRedisClient();
-    const resend = getResendClient();
 
     // 2. Check Send Rate Limit in Redis (Max 3 sends per 15 min)
     const rateLimitKey = `ratelimit:send:${email}`;
@@ -51,31 +50,13 @@ export async function POST(request) {
     const otpKey = `otp:${email}`;
     await redis.set(otpKey, hashedOtp, { ex: OTP_EXPIRY_SECONDS });
 
-    // 5. Send Email via Resend
-    const senderEmail = process.env.RESEND_FROM_EMAIL || 'OTP Login <onboarding@resend.dev>';
-
-    const { error: emailError } = await resend.emails.send({
-      from: senderEmail,
-      to: email,
-      subject: `Your Login Code: ${plainOtp}`,
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
-          <h2 style="color: #111827; margin-bottom: 8px;">Your Verification Code</h2>
-          <p style="color: #4b5563; font-size: 15px; margin-bottom: 24px;">Use the 6-digit verification code below to complete your login. This code is valid for <strong>5 minutes</strong>.</p>
-          <div style="background: #f3f4f6; border-radius: 8px; padding: 18px; text-align: center; margin-bottom: 24px;">
-            <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #111827; font-family: monospace;">${plainOtp}</span>
-          </div>
-          <p style="color: #6b7280; font-size: 13px; line-height: 1.5; margin: 0;">
-            If you did not request this login code, you can safely ignore this email. Someone may have mistyped their email address.
-          </p>
-        </div>
-      `,
-    });
-
-    if (emailError) {
-      console.error('Resend delivery error:', emailError);
+    // 5. Send Email via Mailer (Gmail SMTP or Resend fallback)
+    try {
+      await sendOtpEmail({ to: email, otp: plainOtp });
+    } catch (deliveryError) {
+      console.error('Email delivery error:', deliveryError);
       return NextResponse.json(
-        { error: 'Failed to deliver verification email. Please check your configuration.' },
+        { error: 'Failed to deliver verification email. Please check your email configuration.' },
         { status: 500 }
       );
     }
