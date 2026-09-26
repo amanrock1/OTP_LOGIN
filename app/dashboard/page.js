@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '@/lib/session';
 import LogoutButton from './LogoutButton';
+import IdleSessionManager from '../components/IdleSessionManager';
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -18,6 +19,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="container" style={{ maxWidth: 540 }}>
+      {/* Background manager handles 20-minute inactivity auto-logout */}
+      <IdleSessionManager />
+
       <div className="dashboard-card">
         <div className="status-badge">
           <span className="status-dot"></span>
@@ -51,8 +55,9 @@ export default async function DashboardPage() {
           <ul style={{ listStyle: 'none', fontSize: 13, color: '#d1d5db', lineHeight: 1.8 }}>
             <li>🛡️ <strong>JWT Signature:</strong> Verified on Edge Runtime (jose)</li>
             <li>🍪 <strong>Cookie:</strong> HTTP-Only, Secure, SameSite=Lax</li>
+            <li>⏱️ <strong>Inactivity Timeout:</strong> Auto-logout after 20 mins of idle</li>
             <li>🔑 <strong>OTP Storage:</strong> SHA-256 Hashed in Upstash Redis</li>
-            <li>⏳ <strong>Automatic Expiry:</strong> 5-Minute TTL</li>
+            <li>⏳ <strong>Automatic Expiry:</strong> 5-Minute OTP TTL</li>
             <li>🚦 <strong>Brute-force Shield:</strong> Max 5 failed attempts per email</li>
           </ul>
         </div>

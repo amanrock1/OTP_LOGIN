@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isInactiveLogout = searchParams.get('reason') === 'inactive';
 
   // Form State
   const [step, setStep] = useState('EMAIL'); // 'EMAIL' or 'OTP'
@@ -14,7 +16,9 @@ export default function LoginPage() {
   // UI State
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState(
+    isInactiveLogout ? 'You were logged out due to 20 minutes of inactivity.' : ''
+  );
   const [timerSeconds, setTimerSeconds] = useState(300); // 5 min OTP countdown
   const [resendCooldown, setResendCooldown] = useState(0); // 30s resend button cooldown
 
@@ -95,7 +99,6 @@ export default function LoginPage() {
         setErrorMessage(data.error || 'Invalid verification code.');
       } else {
         setSuccessMessage('Verified! Redirecting to dashboard...');
-        // Redirect and force router refresh to update session state
         setTimeout(() => {
           router.push('/dashboard');
           router.refresh();
@@ -187,9 +190,6 @@ export default function LoginPage() {
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, '');
                     setOtp(val);
-                    if (val.length === 6 && !loading) {
-                      // Trigger submit automatically when 6 digits entered
-                    }
                   }}
                   disabled={loading || timerSeconds === 0}
                 />
@@ -232,5 +232,13 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="container"><div className="auth-card">Loading...</div></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
